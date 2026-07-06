@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Run Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "72", "72full", Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    background: #f5f6f7;
+    color: #32363a;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: #0a6ed1;
+    color: #fff;
+    padding: 0 16px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 15px; font-weight: 600; }
+  .topbar label { font-size: 12px; opacity: .8; }
+  .topbar input[type=file] { font-size: 12px; color: #fff; cursor: pointer; }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Left panel ── */
+  .left-panel {
+    width: 300px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid #d9d9d9;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .run-header {
+    background: #0a6ed1;
+    color: #fff;
+    padding: 12px 16px;
+  }
+  .run-header .run-title { font-size: 14px; font-weight: 600; }
+  .run-header .run-sub { font-size: 11px; opacity: .75; margin-top: 2px; }
+
+  .stat-row {
+    display: flex;
+    border-bottom: 1px solid #e5e5e5;
+  }
+  .stat-box {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    border-right: 1px solid #e5e5e5;
+  }
+  .stat-box:last-child { border-right: none; }
+  .stat-box .stat-num { font-size: 20px; font-weight: 600; color: #0a6ed1; }
+  .stat-box .stat-label { font-size: 10px; color: #6a7070; margin-top: 2px; }
+  .stat-box.clickable { cursor: pointer; transition: background .1s; }
+  .stat-box.clickable:hover { background: #f5f6f7; }
+  .stat-box.clickable.active { background: #fff4f4; }
+  .stat-box.clickable[onclick*="__success__"].active { background: #f1fdf6; }
+  .stat-box.clickable[onclick*="__all__"].active { background: #e8f1fd; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6a7070;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 10px 16px 4px;
+    background: #f5f6f7;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  .service-list { list-style: none; }
+  .service-item {
+    padding: 8px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background .1s;
+  }
+  .service-item:hover { background: #e8f1fd; }
+  .service-item.active { background: #d1e8ff; font-weight: 600; }
+  .service-item .svc-name { font-size: 12px; }
+  .service-item .svc-count {
+    font-size: 11px;
+    background: #0a6ed1;
+    color: #fff;
+    border-radius: 10px;
+    padding: 1px 7px;
+  }
+
+  .har-files {
+    padding: 8px 16px;
+    font-size: 11px;
+    color: #6a7070;
+    border-bottom: 1px solid #e5e5e5;
+  }
+  .har-files .har-tag {
+    display: inline-block;
+    background: #e8f1fd;
+    color: #0a6ed1;
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin: 2px 2px 2px 0;
+  }
+
+  /* ── Right panel ── */
+  .right-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .right-panel h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #32363a;
+  }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-bar input {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 12px;
+    width: 220px;
+    outline: none;
+  }
+  .filter-bar input:focus { border-color: #0a6ed1; }
+  .method-filters { display: flex; gap: 4px; }
+  .method-btn {
+    border: 1px solid #d9d9d9;
+    border-radius: 3px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+    transition: all .1s;
+  }
+  .method-btn.active-filter { color: #fff; border-color: transparent; }
+  .method-btn[data-method="GET"].active-filter  { background: #0a6ed1; }
+  .method-btn[data-method="POST"].active-filter { background: #107e3e; }
+  .method-btn[data-method="PUT"].active-filter  { background: #df6e0c; }
+  .method-btn[data-method="PATCH"].active-filter { background: #9c27b0; }
+  .method-btn[data-method="DELETE"].active-filter { background: #bb0000; }
+
+  /* ── API call cards ── */
+  .call-card {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .call-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .1s;
+  }
+  .call-header:hover { background: #f9f9f9; }
+
+  .method-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    min-width: 46px;
+    text-align: center;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .badge-GET    { background: #0a6ed1; }
+  .badge-POST   { background: #107e3e; }
+  .badge-PUT    { background: #df6e0c; }
+  .badge-PATCH  { background: #9c27b0; }
+  .badge-DELETE { background: #bb0000; }
+  .badge-OTHER  { background: #6a7070; }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .status-2xx { background: #f1fdf6; color: #107e3e; border: 1px solid #b5dfca; }
+  .status-4xx { background: #fff4f4; color: #bb0000; border: 1px solid #f5c2c2; }
+  .status-5xx { background: #fff8f0; color: #df6e0c; border: 1px solid #f5d9b5; }
+
+  .call-url {
+    font-size: 12px;
+    color: #32363a;
+    word-break: break-all;
+    flex: 1;
+  }
+  .call-url .url-path { color: #0a6ed1; }
+
+  .call-time {
+    font-size: 10px;
+    color: #6a7070;
+    flex-shrink: 0;
+  }
+
+  .chevron {
+    font-size: 10px;
+    color: #6a7070;
+    flex-shrink: 0;
+    transition: transform .15s;
+  }
+  .chevron.open { transform: rotate(90deg); }
+
+  .call-body {
+    display: none;
+    border-top: 1px solid #e5e5e5;
+  }
+  .call-body.open { display: block; }
+
+  .call-body-tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e5e5;
+    background: #f5f6f7;
+  }
+  .body-tab {
+    padding: 6px 14px;
+    font-size: 11px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: #6a7070;
+  }
+  .body-tab.active { border-bottom-color: #0a6ed1; color: #0a6ed1; font-weight: 600; }
+
+  .body-pane { display: none; padding: 12px 14px; }
+  .body-pane.active { display: block; }
+
+  pre {
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    background: #f8f8f8;
+    border: 1px solid #e5e5e5;
+    border-radius: 3px;
+    padding: 10px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .url-full {
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    word-break: break-all;
+    padding: 8px 10px;
+    background: #f8f8f8;
+    border: 1px solid #e5e5e5;
+    border-radius: 3px;
+  }
+
+  .params-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .params-table th {
+    text-align: left;
+    padding: 5px 8px;
+    background: #f5f6f7;
+    border: 1px solid #e5e5e5;
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .params-table td {
+    padding: 5px 8px;
+    border: 1px solid #e5e5e5;
+    word-break: break-all;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6a7070;
+  }
+  .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+  .empty-state p { font-size: 13px; }
+
+  .no-results { text-align: center; padding: 30px; color: #6a7070; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>SAP C4C API Run Viewer</h1>
+  <label>Load run file:</label>
+  <input type="file" id="fileInput" accept=".json,.har">
+</div>
+
+<div class="layout">
+  <div class="left-panel" id="leftPanel">
+    <div class="empty-state">
+      <div class="icon">📂</div>
+      <p>Load a run JSON file to get started</p>
+    </div>
+  </div>
+
+  <div class="right-panel" id="rightPanel">
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <p>Select a run file and choose a service from the left panel</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let runData = null;
+let activeService = null;
+let activeMethodFilters = new Set();
+let searchText = '';
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      // HAR file: convert to runData shape on the fly
+      if (parsed.log && parsed.log.entries) {
+        const C4C_MARKER = '/sap/c4c/api/v1/';
+        const entries = parsed.log.entries
+          .filter(e => e.request?.url?.includes(C4C_MARKER))
+          .map(e => {
+            const text = e.response?.content?.text;
+            const mime = e.response?.content?.mimeType ?? '';
+            let response = undefined;
+            if (text && mime.includes('json')) {
+              try { response = JSON.parse(text); } catch {}
+            }
+            return {
+              method: e.request.method.toUpperCase(),
+              url: e.request.url,
+              status: e.response?.status ?? 0,
+              timestamp: e.startedDateTime,
+              response,
+            };
+          });
+        runData = {
+          runAt: entries[0]?.timestamp ?? new Date().toISOString(),
+          harFiles: [file.name],
+          entries,
+        };
+      } else {
+        // Already a run JSON file
+        runData = parsed;
+      }
+      activeService = null;
+      activeMethodFilters = new Set();
+      searchText = '';
+      renderLeft();
+      renderRight(null);
+    } catch {
+      alert('Could not parse file.');
+    }
+  };
+  reader.readAsText(file);
+});
+
+function groupByService(entries) {
+  const map = {};
+  for (const entry of entries) {
+    const m = entry.url.match(/\/sap\/c4c\/api\/v1\/([^/?]+)/);
+    const svc = m ? m[1] : 'other';
+    if (!map[svc]) map[svc] = [];
+    map[svc].push(entry);
+  }
+  return map;
+}
+
+function renderLeft() {
+  const panel = document.getElementById('leftPanel');
+  const grouped = groupByService(runData.entries);
+  const total = runData.entries.length;
+  const ok = runData.entries.filter(e => e.status >= 200 && e.status < 300).length;
+  const err = runData.entries.filter(e => e.status >= 400).length;
+
+  const runDate = new Date(runData.runAt).toLocaleString();
+  const harTags = runData.harFiles.map(f => `<span class="har-tag">${f}</span>`).join('');
+
+  const serviceItems = Object.entries(grouped)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([svc, entries]) => `
+      <li class="service-item" data-service="${svc}" onclick="selectService('${svc}')">
+        <span class="svc-name">${svc}</span>
+        <span class="svc-count">${entries.length}</span>
+      </li>
+    `).join('');
+
+  panel.innerHTML = `
+    <div class="run-header">
+      <div class="run-title">Run: ${runDate}</div>
+      <div class="run-sub">${total} API calls captured</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box clickable ${activeService === '__all__' ? 'active' : ''}" onclick="selectService('__all__')">
+        <div class="stat-num">${total}</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-box clickable ${activeService === '__success__' ? 'active' : ''}" onclick="selectService('__success__')">
+        <div class="stat-num" style="color:#107e3e">${ok}</div>
+        <div class="stat-label">Success</div>
+      </div>
+      <div class="stat-box clickable ${activeService === '__errors__' ? 'active' : ''}" onclick="selectService('__errors__')">
+        <div class="stat-num" style="color:#bb0000">${err}</div>
+        <div class="stat-label">Errors</div>
+      </div>
+    </div>
+    <div class="section-title">HAR Sources</div>
+    <div class="har-files">${harTags}</div>
+    <div class="section-title">Services (${Object.keys(grouped).length})</div>
+    <ul class="service-list">
+      <li class="service-item ${activeService === '__all__' ? 'active' : ''}" data-service="__all__" onclick="selectService('__all__')">
+        <span class="svc-name">All services</span>
+        <span class="svc-count">${total}</span>
+      </li>
+      ${serviceItems}
+    </ul>
+  `;
+}
+
+function selectService(svc) {
+  activeService = svc;
+  document.querySelectorAll('.service-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.service === svc);
+  });
+  renderRight(svc);
+}
+
+function renderRight(svc) {
+  const panel = document.getElementById('rightPanel');
+  if (!runData) return;
+
+  const grouped = groupByService(runData.entries);
+  let entries = svc === '__all__' || svc === null
+    ? runData.entries
+    : svc === '__errors__'
+    ? runData.entries.filter(e => e.status >= 400)
+    : svc === '__success__'
+    ? runData.entries.filter(e => e.status >= 200 && e.status < 300)
+    : (grouped[svc] || []);
+
+  const title = svc === '__all__' ? 'All Services'
+    : svc === '__errors__' ? 'Errors (4xx / 5xx)'
+    : svc === '__success__' ? 'Success (2xx)'
+    : (svc || 'Select a service');
+
+  // Get all methods present
+  const methods = [...new Set(entries.map(e => e.method))].sort();
+
+  panel.innerHTML = `
+    <h2>${title}</h2>
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="Search URL..." value="${searchText}" oninput="onSearch(this.value)">
+      <div class="method-filters" id="methodFilters">
+        ${methods.map(m => `
+          <button class="method-btn ${activeMethodFilters.has(m) ? 'active-filter' : ''}"
+            data-method="${m}" onclick="toggleMethod('${m}')">${m}</button>
+        `).join('')}
+      </div>
+    </div>
+    <div id="callList"></div>
+  `;
+
+  renderCalls(entries);
+}
+
+function onSearch(val) {
+  searchText = val;
+  refilter();
+}
+
+function toggleMethod(method) {
+  if (activeMethodFilters.has(method)) activeMethodFilters.delete(method);
+  else activeMethodFilters.add(method);
+  document.querySelectorAll('.method-btn').forEach(btn => {
+    btn.classList.toggle('active-filter', activeMethodFilters.has(btn.dataset.method));
+  });
+  refilter();
+}
+
+function refilter() {
+  const grouped = groupByService(runData.entries);
+  let entries = activeService === '__all__' || !activeService
+    ? runData.entries
+    : activeService === '__errors__'
+    ? runData.entries.filter(e => e.status >= 400)
+    : activeService === '__success__'
+    ? runData.entries.filter(e => e.status >= 200 && e.status < 300)
+    : (grouped[activeService] || []);
+  renderCalls(entries);
+}
+
+function renderCalls(entries) {
+  // Apply filters
+  let filtered = entries;
+  if (activeMethodFilters.size > 0) {
+    filtered = filtered.filter(e => activeMethodFilters.has(e.method));
+  }
+  if (searchText) {
+    const q = searchText.toLowerCase();
+    filtered = filtered.filter(e => e.url.toLowerCase().includes(q));
+  }
+
+  const list = document.getElementById('callList');
+  if (!list) return;
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="no-results">No calls match the current filters.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map((entry, i) => {
+    const id = `call-${i}-${Date.now()}`;
+    const methodClass = `badge-${entry.method}` in {'badge-GET':1,'badge-POST':1,'badge-PUT':1,'badge-PATCH':1,'badge-DELETE':1}
+      ? `badge-${entry.method}` : 'badge-OTHER';
+
+    let statusClass = 'status-2xx';
+    if (entry.status >= 400 && entry.status < 500) statusClass = 'status-4xx';
+    if (entry.status >= 500) statusClass = 'status-5xx';
+
+    const url = new URL(entry.url);
+    const params = [...url.searchParams.entries()];
+    const paramRows = params.map(([k,v]) =>
+      `<tr><td>${escHtml(k)}</td><td>${escHtml(v)}</td></tr>`
+    ).join('');
+
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    const responseJson = entry.response
+      ? escHtml(JSON.stringify(entry.response, null, 2))
+      : '<em style="color:#6a7070">No response body captured</em>';
+
+    return `
+      <div class="call-card">
+        <div class="call-header" onclick="toggleCall('${id}')">
+          <span class="method-badge ${methodClass}">${entry.method}</span>
+          <span class="status-badge ${statusClass}">${entry.status}</span>
+          <span class="call-url"><span class="url-path">${escHtml(url.pathname)}</span>${url.search ? `<span style="color:#6a7070">${escHtml(url.search)}</span>` : ''}</span>
+          <span class="call-time">${time}</span>
+          <span class="chevron" id="chev-${id}">▶</span>
+        </div>
+        <div class="call-body" id="body-${id}">
+          <div class="call-body-tabs">
+            <div class="body-tab active" onclick="switchTab(event, '${id}', 'response')">Response</div>
+            <div class="body-tab" onclick="switchTab(event, '${id}', 'url')">Full URL</div>
+            ${params.length > 0 ? `<div class="body-tab" onclick="switchTab(event, '${id}', 'params')">Params (${params.length})</div>` : ''}
+          </div>
+          <div class="body-pane active" id="pane-${id}-response">
+            <pre>${responseJson}</pre>
+          </div>
+          <div class="body-pane" id="pane-${id}-url">
+            <div class="url-full">${escHtml(entry.url)}</div>
+          </div>
+          ${params.length > 0 ? `
+          <div class="body-pane" id="pane-${id}-params">
+            <table class="params-table">
+              <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+              <tbody>${paramRows}</tbody>
+            </table>
+          </div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleCall(id) {
+  const body = document.getElementById(`body-${id}`);
+  const chev = document.getElementById(`chev-${id}`);
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+
+function switchTab(event, id, tab) {
+  const bodyEl = document.getElementById(`body-${id}`);
+  bodyEl.querySelectorAll('.body-tab').forEach(t => t.classList.remove('active'));
+  bodyEl.querySelectorAll('.body-pane').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  const pane = document.getElementById(`pane-${id}-${tab}`);
+  if (pane) pane.classList.add('active');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

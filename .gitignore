@@ -1,0 +1,6 @@
+hars/
+output/
+node_modules/
+dist/
+*.har
+*.png

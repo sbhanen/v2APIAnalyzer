@@ -1,0 +1,17 @@
+{
+  "name": "find-v2-apis",
+  "version": "1.0.0",
+  "description": "Parse HAR files to build a living SAP C4C OData API catalog",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "start": "node dist/index.js",
+    "catalog": "node --loader ts-node/esm src/index.ts --hars ./hars --output ./output"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  }
+}
